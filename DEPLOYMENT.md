@@ -89,6 +89,31 @@ Stripe's test success, decline and cancel cases. Refresh the saved ticket to
 verify the reference is stable. Check that `/admin/login` loads when opened
 directly and that an ordinary user is denied administrator endpoints.
 
+## Deployment verification — 24 November 2026
+
+The production site at [airline-manager.vercel.app](https://airline-manager.vercel.app/)
+was checked after configuring Atlas, the matching Google client IDs and the
+production Google JavaScript origin, and the Stripe test key and webhook secret.
+
+- The health endpoint returned HTTP 200 with the database connected. Airport and
+  route endpoints supplied the four demo airports and twelve Flyhigh routes.
+- A hosted Stripe test checkout was created through the authenticated Flyhigh
+  API using a synthetic test account and passenger. Stripe reported
+  `livemode: false`, and its INR amount matched the fare stored in MongoDB.
+- Canceling that checkout expired its Stripe session, created no booking, and
+  left the departure's seat count unchanged. The test account was signed out.
+- A harmless signed webhook check returned HTTP 200. A forged signature returned
+  HTTP 400. The configured test destination subscribes to
+  `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+
+This production check did not submit a paid checkout. Successful payment
+fulfillment, repeated confirmations, ownership checks, inventory allocation and
+failure recovery are also covered by the backend's automated tests.
+
+The temporary file used to transfer the Stripe secrets into Vercel was removed
+after verification. Secret values, environment files, and live database contents
+are not part of this repository. No live payment key was enabled.
+
 ## Troubleshooting
 
 - **404 on `/api/airports`:** the deployed commit does not include the API

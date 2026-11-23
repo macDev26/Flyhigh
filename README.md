@@ -5,6 +5,18 @@ flights; administrators manage its routes, departures, passengers and bookings.
 Stripe runs exclusively in test mode. This project does not charge real money or
 issue valid travel documents.
 
+## Live demo
+
+Open [Flyhigh Airlines](https://airline-manager.vercel.app/) or
+[administrator sign-in](https://airline-manager.vercel.app/admin/login).
+The hosted application uses Vercel, MongoDB Atlas, Google sign-in and Stripe
+test checkout. Search a future date within the next fourteen days to explore
+the demo network.
+
+For the hosted setup and recorded verification results, see
+[DEPLOYMENT.md](DEPLOYMENT.md). Credentials and database records are managed
+outside the repository; a separate deployment needs its own environment settings.
+
 ## Earlier demo recordings
 
 These recordings show an earlier version of the project and predate the current
