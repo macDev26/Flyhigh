@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 
 const Footer = () => {
@@ -16,7 +15,7 @@ const Footer = () => {
               <span className="text-2xl font-extrabold gradient-text">Flyhigh</span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Your premium airline partner. Book flights, manage reservations, and explore destinations worldwide.
+              Flyhigh is your airline. Book our flights directly, explore our domestic network, and manage your journey.
             </p>
             {/* Social Icons */}
             <div className="flex items-center gap-4 mt-6">
@@ -86,7 +85,7 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="mt-14 pt-8 border-t border-white/[0.06] flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-slate-500 text-sm">&copy; {new Date().getFullYear()} Flyhigh Airlines. All rights reserved.</p>
+          <p className="text-slate-500 text-sm">&copy; {new Date().getFullYear()} Flyhigh Airlines · Learning project · Test payments only.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">Privacy Policy</a>
             <a href="#" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">Terms of Service</a>

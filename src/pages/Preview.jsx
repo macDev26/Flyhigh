@@ -1,41 +1,31 @@
-import React, { useState } from 'react';
+import { useRef, useState } from 'react';
 import NavbarM from '../components/NavbarM';
 import { useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiFetch } from '../lib/api';
 import Footer from '../components/Footer';
 
 const Preview = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const data = location.state || {};
-  data.user = user;
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const requestId = useRef(crypto.randomUUID());
 
   const totalcost = (data.data?.price || 0) * (data.data?.passengers || 1);
 
   const handleClick = async () => {
-    setLoading(true);
-    sessionStorage.removeItem('bookingSent');
-    
+    if (loading) return;
+    setLoading(true); setError('');
     try {
-      const response = await axios.post("http://localhost:3001/api/payments", data);
-      
-      // If Stripe returns a valid checkout URL, redirect to Stripe
-      if (response && response.data && response.data.url) {
-        window.location.href = response.data.url;
-      } else {
-        // Fallback demo mode if Stripe key is not configured: navigate directly to e-ticket
-        const encodedData = encodeURIComponent(JSON.stringify(data));
-        navigate(`/eticket?info=${encodedData}`);
-      }
-    } catch (err) {
-      console.warn("Payment checkout API fallback:", err);
-      // Fallback mode for seamless user testing
-      const encodedData = encodeURIComponent(JSON.stringify(data));
-      navigate(`/eticket?info=${encodedData}`);
-    } finally {
-      setLoading(false);
-    }
+      const response = await apiFetch('/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: data.data, formData: data.formData, requestId: requestId.current }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Unable to start test checkout.');
+      if (result.bookingId) navigate(`/eticket?booking_id=${encodeURIComponent(result.bookingId)}`);
+      else if (result.url?.startsWith('https://checkout.stripe.com/')) window.location.assign(result.url);
+      else throw new Error(result.message || 'Checkout could not be opened. No booking has been confirmed.');
+    } catch (err) { setError(err.message || 'Unable to reach checkout. Please try again.'); }
+    finally { setLoading(false); }
   };
 
   const timeDifference = (startTime, endTime) => {
@@ -72,6 +62,8 @@ const Preview = ({ user }) => {
   const [depDate, depTime] = formatDateTime(flightInfo.departureTime);
   const [arrDate, arrTime] = formatDateTime(flightInfo.arrivalTime);
 
+  if (!flightInfo.scheduleId) return <div className="min-h-screen bg-slate-950 text-white"><NavbarM user={user} /><main className="mx-auto max-w-xl px-6 py-20 text-center"><h1 className="text-2xl font-bold">Choose a Flyhigh departure first</h1><p className="mt-4 text-slate-400">Your booking preview needs a scheduled flight and passenger details.</p><button onClick={() => navigate('/')} className="mt-6 rounded-xl bg-violet-600 px-6 py-3">Search Flyhigh flights</button></main></div>;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white font-sans flex flex-col">
       <NavbarM user={user} />
@@ -86,9 +78,10 @@ const Preview = ({ user }) => {
           <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
             Booking Preview & Summary
           </h1>
-          <p className="text-slate-400 text-sm mt-1">Please review your flight and passenger details before proceeding to payment.</p>
+          <p className="text-slate-400 text-sm mt-1">Review your Flyhigh flight and passenger details before the test payment.</p>
         </div>
 
+        <p className="mb-6 rounded-xl border border-violet-400/20 bg-violet-500/10 px-5 py-4 text-sm text-violet-200">Learning project · Stripe test mode. No real money is charged and no real airline ticket is issued.</p>
         {/* Flight Details Card */}
         <div className="rounded-3xl bg-white/[0.05] border border-white/10 p-6 md:p-8 backdrop-blur-xl shadow-2xl mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-white/10">
@@ -193,10 +186,12 @@ const Preview = ({ user }) => {
               <p className="text-3xl font-extrabold text-emerald-400 mt-0.5">₹{totalcost.toLocaleString('en-IN')}</p>
             </div>
             <div className="text-xs text-slate-400 text-right">
-              🔒 256-Bit SSL Encrypted
+              🔒 Hosted by Stripe · Test mode
             </div>
           </div>
 
+          {error && <p role="alert" className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
+          {!user && <p className="text-sm text-rose-200">Sign in before starting checkout.</p>}
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
             <button
@@ -208,17 +203,17 @@ const Preview = ({ user }) => {
 
             <button
               onClick={handleClick}
-              disabled={loading}
+              disabled={loading || !user}
               className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 hover:from-emerald-400 hover:to-indigo-500 text-white font-bold text-base shadow-xl shadow-emerald-500/20 hover:shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Processing Payment...
+                  Opening test checkout…
                 </>
               ) : (
                 <>
-                  <span>Proceed to Payment</span>
+                  <span>Continue to Stripe test payment</span>
                   <span className="text-lg">→</span>
                 </>
               )}

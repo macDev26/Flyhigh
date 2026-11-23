@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "db:start": "node localMongo.js",
+    "test": "node --test auth.test.js payments.test.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "google-auth-library": "^11.3.4",
     "mongodb": "^6.7.0",
     "multer": "^1.4.5-lts.1",
     "stripe": "^15.10.0"

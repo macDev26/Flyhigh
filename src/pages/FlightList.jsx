@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { apiFetch } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import NavbarL from '../components/NavbarL';
 import Footer from '../components/Footer';
 
 const FlightList = ({ user, setUser }) => {
-  const location = useLocation();
   const navigate = useNavigate();
-  const data = location.state || {};
+  const params = useParams();
+  const data = { originAirport: params.originAirport?.replace(/^origin=/, ''), destinationAirport: params.destinationAirport?.replace(/^destination=/, ''), selectedDate: params.selectedDate?.replace(/^date=/, ''), passengers: Math.max(1, Math.min(9, Number(params.passengers?.replace(/^passengers=/, '')) || 1)) };
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   const formatDateTime = (dateTimeString) => {
     if (typeof dateTimeString !== 'string') return ["Invalid Date", ""];
@@ -25,53 +28,18 @@ const FlightList = ({ user, setUser }) => {
   };
 
   useEffect(() => {
-    const fetchFlights = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch('http://localhost:3001/api/flights');
-        if (!response.ok) {
-          throw new Error('Failed to fetch flights');
-        }
-        const flightsData = await response.json();
-        const filteredFlights = flightsData.filter(flight =>
-          flight.originAirport === data.originAirport &&
-          flight.destinationAirport === data.destinationAirport
-        );
-
-        const flightsWithDetails = [];
-        for (const flight_ of filteredFlights) {
-          const detailsResponse = await fetch('http://localhost:3001/api/flightinfo');
-          if (detailsResponse.ok) {
-            const detailsData = await detailsResponse.json();
-            const flightDetails = detailsData.filter(flight =>
-              flight.flightNumber === flight_.flightNumber &&
-              formatDateTime(flight.departureTime)[0] === data.selectedDate?.toString()
-            );
-            if (flightDetails.length > 0) {
-              flightsWithDetails.push({
-                ...flight_,
-                prices: flightDetails[0].prices,
-                seatsAvailable: flightDetails[0].seatsAvailable,
-                departureTime: flightDetails[0].departureTime,
-                arrivalTime: flightDetails[0].arrivalTime
-              });
-            }
-          }
-        }
-        setFlights(flightsWithDetails);
-      } catch (err) {
-        console.error("Error fetching flight list:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (data.originAirport && data.destinationAirport && data.selectedDate) {
-      fetchFlights();
-    } else {
-      setLoading(false);
-    }
-  }, [data.originAirport, data.destinationAirport, data.selectedDate]);
+    let active = true;
+    setLoading(true); setError('');
+    Promise.all([apiFetch('/api/flights'), apiFetch('/api/flightinfo')]).then(async responses => {
+      if (responses.some(response => !response.ok)) throw new Error('Unable to load Flyhigh departures. Please try again.');
+      const [routes, schedules] = await Promise.all(responses.map(response => response.json()));
+      const selectedRoutes = new Map(routes.filter(route => route.originAirport === data.originAirport && route.destinationAirport === data.destinationAirport).map(route => [route.flightNumber, route]));
+      const results = schedules.filter(schedule => selectedRoutes.has(schedule.flightNumber) && (schedule.newdepTime || schedule.departureTime)?.split('T')[0] === data.selectedDate && new Date((schedule.newdepTime || schedule.departureTime) + '+05:30').getTime() > Date.now()).map(schedule => ({ ...selectedRoutes.get(schedule.flightNumber), ...schedule, scheduleId: schedule._id, departureTime: schedule.newdepTime || schedule.departureTime, arrivalTime: schedule.newarrTime || schedule.arrivalTime })).sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+      if (active) setFlights(results);
+    }).catch(err => { if (active) setError(err.message || 'Unable to load flights.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [data.originAirport, data.destinationAirport, data.selectedDate, attempt]);
 
   const timeDifference = (startTime, endTime) => {
     const start = new Date(startTime);
@@ -79,7 +47,7 @@ const FlightList = ({ user, setUser }) => {
     const diffMs = end - start;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (isNaN(diffHours)) return "2h 00m";
     if (diffMinutes !== 0) {
       return `${diffHours.toString().padStart(2, '0')}h ${diffMinutes.toString().padStart(2, '0')}m`;
@@ -89,9 +57,9 @@ const FlightList = ({ user, setUser }) => {
 
   const getAirlineBadgeColor = (airlineName) => {
     if (!airlineName) return 'from-indigo-500 to-purple-500';
-    if (airlineName.includes('Air India')) return 'from-red-500 to-amber-600';
-    if (airlineName.includes('IndiGo')) return 'from-blue-600 to-indigo-600';
-    if (airlineName.includes('SpiceJet')) return 'from-orange-500 to-amber-500';
+
+
+
     return 'from-brand-500 to-purple-500';
   };
 
@@ -101,7 +69,7 @@ const FlightList = ({ user, setUser }) => {
 
       {/* Main Container */}
       <main className="flex-grow max-w-6xl w-full mx-auto px-4 py-8">
-        
+
         {/* Search Header Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-white/[0.05] border border-white/10 p-6 md:p-8 backdrop-blur-xl shadow-2xl mb-8">
           <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -113,7 +81,7 @@ const FlightList = ({ user, setUser }) => {
                 <svg className="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                Available Flights
+                Flyhigh departures
               </div>
 
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
@@ -121,7 +89,7 @@ const FlightList = ({ user, setUser }) => {
                 <span className="text-brand-400">→</span>
                 <span>{data.destinationAirport || 'Destination'}</span>
               </h1>
-              
+
               <div className="flex flex-wrap items-center gap-4 mt-3 text-slate-300 text-sm">
                 <span className="flex items-center gap-1.5 bg-white/[0.06] px-3 py-1 rounded-full border border-white/10">
                   📅 {formatDate(data.selectedDate)}
@@ -166,14 +134,14 @@ const FlightList = ({ user, setUser }) => {
         )}
 
         {/* Empty State */}
-        {!loading && flights.length === 0 && (
+        {!loading && !error && flights.length === 0 && (
           <div className="text-center py-16 px-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-4xl text-indigo-400">
               ✈️
             </div>
             <h3 className="text-2xl font-bold text-white mb-2">No Flights Found</h3>
             <p className="text-slate-400 max-w-md mx-auto text-sm mb-8 leading-relaxed">
-              We couldn't find any direct flights from <strong className="text-white">{data.originAirport}</strong> to <strong className="text-white">{data.destinationAirport}</strong> on {formatDate(data.selectedDate)}.
+              No Flyhigh departures are scheduled from <strong className="text-white">{data.originAirport}</strong> to <strong className="text-white">{data.destinationAirport}</strong> on {formatDate(data.selectedDate)}.
             </p>
             <button
               onClick={() => navigate('/')}
@@ -184,8 +152,9 @@ const FlightList = ({ user, setUser }) => {
           </div>
         )}
 
+        {error && <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-8 text-center" role="alert"><p>{error}</p><button className="mt-4 rounded-xl bg-violet-600 px-5 py-3" onClick={() => setAttempt(value => value + 1)}>Try again</button></div>}
         {/* Flight Cards List */}
-        {!loading && flights.length > 0 && (
+        {!loading && !error && flights.length > 0 && (
           <div className="space-y-6">
             {flights.map((flight, index) => {
               const [depDate, depTime] = formatDateTime(flight.departureTime);
@@ -261,7 +230,7 @@ const FlightList = ({ user, setUser }) => {
                             </div>
                             <div className="text-xs text-slate-400 mb-4 flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                              {flight.seatsAvailable.economy} seats remaining
+                              {flight.seatsAvailable.economy} seats remaining{flight.seatsAvailable.economy < data.passengers ? ' · Not enough for this group' : ''}
                             </div>
                           </>
                         ) : (
@@ -269,7 +238,7 @@ const FlightList = ({ user, setUser }) => {
                         )}
                       </div>
 
-                      {flight.seatsAvailable.economy !== -1 && (
+                      {flight.seatsAvailable.economy >= data.passengers && (
                         user ? (
                           <Link
                             to="/passform"
@@ -278,6 +247,7 @@ const FlightList = ({ user, setUser }) => {
                               destinationAirport: data.destinationAirport,
                               passengers: data.passengers,
                               price: flight.prices.economy,
+                              scheduleId: flight.scheduleId,
                               flightNumber: flight.flightNumber,
                               flightName: flight.flightName,
                               departureTime: flight.departureTime,
@@ -314,7 +284,7 @@ const FlightList = ({ user, setUser }) => {
                             </div>
                             <div className="text-xs text-slate-400 mb-4 flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-purple-400" />
-                              {flight.seatsAvailable.business} seats remaining
+                              {flight.seatsAvailable.business} seats remaining{flight.seatsAvailable.business < data.passengers ? ' · Not enough for this group' : ''}
                             </div>
                           </>
                         ) : (
@@ -322,7 +292,7 @@ const FlightList = ({ user, setUser }) => {
                         )}
                       </div>
 
-                      {flight.seatsAvailable.business !== -1 && (
+                      {flight.seatsAvailable.business >= data.passengers && (
                         user ? (
                           <Link
                             to="/passform"
@@ -331,6 +301,7 @@ const FlightList = ({ user, setUser }) => {
                               destinationAirport: data.destinationAirport,
                               passengers: data.passengers,
                               price: flight.prices.business,
+                              scheduleId: flight.scheduleId,
                               flightNumber: flight.flightNumber,
                               flightName: flight.flightName,
                               departureTime: flight.departureTime,
@@ -375,7 +346,7 @@ const FlightList = ({ user, setUser }) => {
                         )}
                       </div>
 
-                      {flight.seatsAvailable.first !== -1 && (
+                      {flight.seatsAvailable.first >= data.passengers && (
                         user ? (
                           <Link
                             to="/passform"
@@ -384,6 +355,7 @@ const FlightList = ({ user, setUser }) => {
                               destinationAirport: data.destinationAirport,
                               passengers: data.passengers,
                               price: flight.prices.first,
+                              scheduleId: flight.scheduleId,
                               flightNumber: flight.flightNumber,
                               flightName: flight.flightName,
                               departureTime: flight.departureTime,

@@ -1,5 +1,6 @@
+import { apiFetch } from '../lib/api';
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const Body = () => {
   const [showBookFlight, setShowBookFlight] = useState(true);
@@ -15,7 +16,6 @@ const Body = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedDate_, setSelectedDate_] = useState('');
 
-  const navigate = useNavigate();
 
   const currentDateUTC = new Date();
   const currentDateIST = new Date(currentDateUTC.getTime() + (5.5 * 60 * 60 * 1000));
@@ -35,7 +35,7 @@ const Body = () => {
   };
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/airports')
+    apiFetch('/api/airports')
       .then(response => response.json())
       .then(data => {
         const Filter = data.filter(airport => airport.code !== destinationAirport);
@@ -45,7 +45,7 @@ const Body = () => {
   }, [destinationAirport]);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/airports')
+    apiFetch('/api/airports')
       .then(response => response.json())
       .then(data => {
         const Filter = data.filter(airport => airport.code !== destinationAirport_);
@@ -55,7 +55,7 @@ const Body = () => {
   }, [destinationAirport_]);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/airports')
+    apiFetch('/api/airports')
       .then(response => response.json())
       .then(data => {
         const filtered = data.filter(airport => airport.code !== originAirport);
@@ -65,7 +65,7 @@ const Body = () => {
   }, [originAirport]);
   
   useEffect(() => {
-    fetch('http://localhost:3001/api/airports')
+    apiFetch('/api/airports')
       .then(response => response.json())
       .then(data => {
         const filtered = data.filter(airport => airport.code !== originAirport_);
@@ -129,47 +129,7 @@ const Body = () => {
     setSystemDate();
   }, []);
 
-  const handleSubmit = async () => {
-    if (showBookFlight)
-    {
-      console.log("Submitting booking information");
-      const data = {
-        originAirport,
-        destinationAirport,
-        selectedDate,
-        passengers
-      };
-      console.log("Booking submitted:", data);
-    } 
-    else 
-    {
-      console.log("Submitting flight status information");
-      console.log("Flight status submitted:", {
-        originAirport_,
-        destinationAirport_,
-        selectedDate_,
-      });
-      const data = {
-        originAirport_,
-        destinationAirport_,
-        selectedDate_,
-      };
-      let response = await fetch("http://localhost:3001/fltstatus", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      if (response.ok) 
-      {
-        const result = await response.json();
-        console.log('Flight Status submitted successfully:', result);
-      } 
-      else
-      console.error('Failed to submit flight status:', response.statusText);
-    }
-  };
+  const handleSubmit = () => {};
 
   /* ── Feature items data ──────────────────────────────── */
   const features = [
@@ -180,7 +140,7 @@ const Body = () => {
         </svg>
       ),
       title: 'Experience Tranquility',
-      desc: 'Serenity Haven offers a tranquil escape, featuring comfortable seating, calming ambiance and attentive service.',
+      desc: 'Settle into your Flyhigh journey with comfortable seating and attentive service.',
     },
     {
       icon: (
@@ -245,12 +205,12 @@ const Body = () => {
         <div className="relative z-10 flex flex-col items-center w-full max-w-2xl mx-auto px-4 pt-24 pb-16">
           {/* Headline */}
           <h1 className="text-5xl md:text-6xl font-extrabold text-center leading-tight mb-4 animate-fade-in">
-            <span className="text-white">Explore the World</span>
+            <span className="text-white">Fly with confidence</span>
             <br />
             <span className="gradient-text">with Flyhigh</span>
           </h1>
           <p className="text-white/50 text-center text-lg mb-10 animate-fade-in" style={{ animationDelay: '0.15s' }}>
-            Book your next adventure in seconds. Premium flights, unbeatable prices.
+            Book directly with Flyhigh. Explore our routes, choose your cabin, and manage your journey.
           </p>
 
           {/* ── Booking Card ────────────────────────────── */}
@@ -344,7 +304,7 @@ const Body = () => {
             {/* Submit */}
             <div className="mt-8">
               {showBookFlight ? (
-                <Link to={`/fltlist/origin=${originAirport}/destination=${destinationAirport}/date=${selectedDate}/passengers=${passengers}`} state={{ originAirport, destinationAirport, selectedDate, passengers }}>
+                <Link to={`/fltlist/${originAirport}/${destinationAirport}/${selectedDate}/${passengers}`} state={{ originAirport, destinationAirport, selectedDate, passengers }}>
                   <button
                     type="submit"
                     id="submit"
@@ -362,7 +322,7 @@ const Body = () => {
                   </button>
                 </Link>
               ) : (
-                <Link to={`/fltstatus/origin=${originAirport_}/destination=${destinationAirport_}/date=${selectedDate_}`} state={{ originAirport: originAirport_, destinationAirport: destinationAirport_, selectedDate: selectedDate_ }}>
+                <Link to={`/fltstatus/${originAirport_}/${destinationAirport_}/${selectedDate_}`} state={{ originAirport: originAirport_, destinationAirport: destinationAirport_, selectedDate: selectedDate_ }}>
                   <button
                     type="submit"
                     id="submit"
@@ -448,7 +408,7 @@ const Body = () => {
               Explore <span className="gradient-text">New Places</span>
             </h2>
             <p className="text-slate-400 max-w-md mx-auto">
-              Discover India's most vibrant cities with Flyhigh's premium routes.
+              Discover India&apos;s most vibrant cities with Flyhigh&apos;s premium routes.
             </p>
             <div className="mt-4 mx-auto w-20 h-1 rounded-full bg-gradient-to-r from-brand-500 to-purple-500" />
           </div>

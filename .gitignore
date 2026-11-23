@@ -4,3 +4,4 @@ dist
 backend/env.txt
 demo_video/
 .DS_Store
+.local/

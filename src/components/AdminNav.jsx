@@ -1,16 +1,14 @@
-import React from 'react'
+import { Link, useLocation } from 'react-router-dom';
 
-function AdminNav() {
+const titles = { dashboard: 'Overview', userinfo: 'Users', airlinemanagement: 'Airlines', fltmanagement: 'Flights & routes', scheduled: 'Flight schedules', bookings: 'Bookings', feedback: 'Feedback', profile: 'My profile', addairline: 'Add airline', addflt: 'Add flight', scheduleflt: 'Schedule flight', viewflt: 'Airline flights', passinfo: 'Booking passengers', passlist: 'Passenger manifest' };
+
+export default function AdminNav({ user, onMenu, menuOpen }) {
+  const { pathname } = useLocation();
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Administrator';
   return (
-    <div className='admin-nav flex items-center justify-between px-4 md:px-10 h-[50px]'>
-        <a href='/' className='logo font-bold text-2xl flex items-center'><img src="https://img.icons8.com/?size=256&id=48352&format=png" alt="" className='h-16 w-16 mt-2'/><span className='ml-2'>FlyHigh</span></a>
-        <div className='flex flex-col md:flex-row items-center md:w-[600px] justify-end'>
-         {/* <a href='/admin/addflt' className='w-full md:w-[180px] font-bold'><i className="fa-solid fa-plane pr-2"></i>ADD NEW FLIGHT</a> */}
-         {/* <a href='/admin/addairline' className='w-full md:w-[190px] font-bold'><i className="fa-solid fa-plane-departure pr-2"></i>ADD NEW AIRPLANE</a> */}
-         <a href='/admin/profile' className='w-full md:w-[150px] font-bold text-orange-400'>PROFILE<i class="fa-solid fa-right-from-bracket pl-2"></i></a>
-        </div>
-    </div>
-  )
+    <header className="admin-topbar">
+      <div className="admin-breadcrumb"><button className="admin-menu-toggle" onClick={onMenu} aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="admin-navigation">☰</button><span>Workspace</span><span className="admin-crumb-divider">/</span><strong>{titles[pathname.split('/').pop()] || 'Administration'}</strong></div>
+      <Link to="/admin/profile" className="admin-account"><span className="admin-avatar">{name.slice(0, 1)}</span><span><strong>{name}</strong><small>Administration</small></span></Link>
+    </header>
+  );
 }
-
-export default AdminNav

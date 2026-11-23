@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCommentDots, faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -56,7 +57,7 @@ const Feedback = ({ user }) => {
     setIsSubmitting(true);
     try {
       console.log('Submitting feedback:', formData);
-      const response = await fetch('http://localhost:3001/api/feedback', {
+      const response = await apiFetch('/api/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

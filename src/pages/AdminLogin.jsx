@@ -1,0 +1,7 @@
+import { Link, Navigate } from 'react-router-dom';
+import GoogleSignIn from '../components/GoogleSignIn';
+
+export default function AdminLogin({ user, setUser, authLoading }) {
+  if (!authLoading && user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  return <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-5 py-12 text-white"><div className="w-full max-w-md"><Link to="/" className="mb-10 flex justify-center items-center gap-3 text-3xl font-bold"><span className="text-violet-300">✈</span><span>Flyhigh<span className="text-violet-400">.</span></span></Link><section className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl"><p className="text-xs uppercase tracking-[0.2em] text-violet-300">Administration</p><h1 className="mt-4 text-3xl font-semibold tracking-tight">Welcome to your workspace.</h1><p className="mt-4 mb-8 text-sm leading-relaxed text-slate-400">Sign in with your authorized Google account to manage flights, bookings and your airline network.</p><GoogleSignIn role="admin" onSuccess={setUser} /><p className="mt-7 border-t border-white/10 pt-6 text-center text-xs leading-relaxed text-slate-500">Administrator access is available to approved accounts only.</p></section><div className="mt-7 flex justify-between text-xs text-slate-400"><Link to="/login" className="hover:text-violet-300">← Traveler sign-in</Link><Link to="/" className="hover:text-violet-300">Booking website ↗</Link></div></div></main>;
+}

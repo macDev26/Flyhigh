@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import NavbarM from '../components/NavbarM';
@@ -66,12 +67,11 @@ const UserProfile = ({ user, setUser }) => {
     const fetchProfile = async () => {
       if (!activeUser || !activeUser.email) return;
       try {
-        const response = await fetch('http://localhost:3001/api/users');
+        const response = await apiFetch('/api/me');
         if (!response.ok) {
           throw new Error(`Network response was not ok: ${response.statusText}`);
         }
-        const usersList = await response.json();
-        const loggedInUser = usersList.find(profile => profile.email === activeUser.email);
+        const loggedInUser = await response.json();
         
         if (loggedInUser) {
           const updatedProfile = {
@@ -136,7 +136,7 @@ const UserProfile = ({ user, setUser }) => {
 
   const saveProfile = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/update-profile', {
+      const response = await apiFetch('/api/update-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,6 +153,7 @@ const UserProfile = ({ user, setUser }) => {
       
       // Update session storage and app state
       const updatedSessionUser = {
+        role: activeUser.role,
         title: userProfile.title,
         firstName: userProfile.firstName,
         lastName: userProfile.lastName,

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import { apiFetch } from '../lib/api';
+import { useEffect, useRef, useState } from 'react';
 import NavbarM from '../components/NavbarM';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import Footer from '../components/Footer';
 
@@ -10,70 +11,31 @@ const Eticket = ({ user }) => {
   const ticketref = useRef();
   
   const query = new URLSearchParams(location.search);
-  const info = query.get('info');
-  const data = info ? JSON.parse(decodeURIComponent(info)) : {};
-
-  const handlePrint = useReactToPrint({
-    content: () => ticketref.current,
-    documentTitle: `E-Tickets_${data.data?.flightNumber || 'Flyhigh'}`,
-  });
-
-  const now = new Date();
-  const formattedTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-
-  const bookingData = {
-    email: data.user?.email || 'guest@flyhigh.com',
-    data: data.data || {},
-    formData: data.formData || [],
-    time: formattedTime
-  };
-
-  const updateSeatData = {
-    flightNumber: data.data?.flightNumber,
-    departureTime: data.data?.departureTime,
-    arrivalTime: data.data?.arrivalTime,
-    passengers: data.data?.passengers,
-    seat: data.data?.seat ? data.data.seat.toLowerCase() : 'economy'
-  };
-
+  const sessionId = query.get('session_id');
+  const bookingId = query.get('booking_id');
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const handlePrint = useReactToPrint({ content: () => ticketref.current, documentTitle: `Flyhigh_${booking?.bookingReference || 'booking'}` });
   useEffect(() => {
-    if (!sessionStorage.getItem('bookingSent') && data.data) {
-      sessionStorage.setItem('bookingSent', 'true');
-      
-      const sendBooking = async () => {
-        try {
-          let response = await fetch("http://localhost:3001/bookings", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingData)
-          });
-          if (response.ok) {
-            console.log('Booking recorded successfully in MongoDB');
-          }
-        } catch (err) {
-          console.error('Failed to submit booking:', err);
-        }
-      };
-
-      const updateFlightSeats = async () => {
-        try {
-          let response = await fetch("http://localhost:3001/api/flight", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateSeatData)
-          });
-          if (response.ok) {
-            console.log('Seats updated successfully in MongoDB');
-          }
-        } catch (err) {
-          console.error('Failed to update seats:', err);
-        }
-      };
-
-      updateFlightSeats();
-      sendBooking();
-    }
-  }, []);
+    let active = true;
+    setBooking(null); setMessage(''); setLoading(true);
+    if (!user || (!sessionId && !bookingId)) { setLoading(false); return; }
+    const request = sessionId
+      ? apiFetch('/api/payments/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+      : apiFetch(`/api/bookings/${encodeURIComponent(bookingId)}`);
+    request.then(async response => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Unable to verify this booking.');
+      if (!active) return;
+      if (!sessionId || result.status === 'confirmed') setBooking(sessionId ? result.booking : result);
+      else setMessage(result.message || 'Payment is not complete. No booking has been confirmed.');
+    }).catch(error => { if (active) setMessage(error.message || 'Unable to check your payment. Try again.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [sessionId, bookingId, user, attempt]);
+  const data = booking || {};
 
   const timeDifference = (startTime, endTime) => {
     if (!startTime || !endTime) return "2h 00m";
@@ -106,10 +68,12 @@ const Eticket = ({ user }) => {
 
   const flight = data.data || {};
   const passengers = data.formData || [];
-  const currentUser = data.user || user || {};
+  const currentUser = user || {};
 
   const [depDate, depTime] = formatDateTime(flight.departureTime);
   const [arrDate, arrTime] = formatDateTime(flight.arrivalTime);
+
+  if (loading || !booking) return <div className="min-h-screen bg-slate-950 text-white"><NavbarM user={user} /><main className="mx-auto max-w-xl px-6 py-20 text-center"><h1 className="text-2xl font-bold">{loading ? 'Verifying your test payment…' : 'Booking not confirmed'}</h1><p className="mt-4 text-slate-400" role={loading ? 'status' : 'alert'}>{loading ? 'Checking Stripe and loading your saved booking.' : !user ? 'Sign in to view your payment and booking.' : message || 'Open a saved booking from My Flights, or complete a Stripe test checkout first.'}</p><div className="mt-6 flex justify-center gap-4">{!user ? <Link className="rounded-xl bg-violet-600 px-5 py-3" to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`}>Sign in</Link> : sessionId && <button className="rounded-xl bg-violet-600 px-5 py-3" onClick={() => setAttempt(value => value + 1)}>Check payment again</button>}<Link className="rounded-xl border border-white/20 px-5 py-3" to="/myflts">My flights</Link></div></main></div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white font-sans flex flex-col">
@@ -123,15 +87,16 @@ const Eticket = ({ user }) => {
             ✓
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-            Booking Confirmed!
+            {booking.payment?.status === 'paid' ? 'Demo booking confirmed' : 'Saved demo booking'}
           </h1>
-          <p className="text-slate-400 text-sm mt-1">Your e-ticket and boarding passes have been issued successfully.</p>
+          <p className="text-slate-400 text-sm mt-1">{booking.payment?.status === 'paid' ? 'Stripe test payment verified. Your Flyhigh demo booking is saved.' : 'A historical booking from your learning project.'}</p>
         </div>
 
+        <p className="mb-6 text-center text-xs text-violet-300">Learning project · This is not a valid travel document. No real money was charged.</p>
         {/* Printable Tickets Area */}
         <div ref={ticketref} className="space-y-8">
           {passengers.map((passenger, index) => {
-            const pnrCode = `FH-${Math.floor(100000 + Math.random() * 900000)}`;
+            const pnrCode = booking.bookingReference || `FH-LEGACY-${String(booking._id).slice(-6).toUpperCase()}`;
 
             return (
               <div
@@ -212,8 +177,8 @@ const Eticket = ({ user }) => {
                         <p className="font-mono font-bold text-white text-base mt-1">{flight.flightNumber}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Gate / Boarding</p>
-                        <p className="font-bold text-emerald-400 text-base mt-1">Gate B4 • 45m Prior</p>
+                        <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Departure details</p>
+                        <p className="font-bold text-emerald-400 text-base mt-1">Demo departure</p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Contact Mobile</p>
@@ -226,7 +191,7 @@ const Eticket = ({ user }) => {
                   <div className="w-full lg:w-72 bg-gradient-to-br from-slate-900 to-indigo-950 p-6 md:p-8 flex flex-col justify-between items-center text-center border-t lg:border-t-0 border-white/10">
                     <div className="w-full">
                       <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Boarding Pass</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Demo e-ticket</span>
                         <span className="text-xs font-bold text-brand-400">#0{index + 1}</span>
                       </div>
 

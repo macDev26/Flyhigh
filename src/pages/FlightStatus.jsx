@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import { apiFetch } from '../lib/api';
+import { useEffect, useState } from 'react'
 import NavbarL from '../components/NavbarL'
-import { useLocation } from 'react-router-dom';
-import Footer from '../components/Footer';
+import { useParams } from 'react-router-dom';
 
 const FlightStatus = ({user, setUser}) => {
 
-    const location = useLocation();
-    const data = location.state || {};
+    const params = useParams();
+  const data = { originAirport: params.originAirport?.replace(/^origin=/, ''), destinationAirport: params.destinationAirport?.replace(/^destination=/, ''), selectedDate: params.selectedDate?.replace(/^date=/, ''), originAirport_: params.originAirport?.replace(/^origin=/, ''), destinationAirport_: params.destinationAirport?.replace(/^destination=/, ''), selectedDate_: params.selectedDate?.replace(/^date=/, '') };
     const [flights, setFlights] = useState([]);
 
     console.log(data);
@@ -21,7 +21,7 @@ const FlightStatus = ({user, setUser}) => {
       // const formattedTime = `${hours}:${minutes}`;
       return [datePart, timePart];
     };
-  
+
     const formatDate = (date) => {
       if (typeof date !== 'string')
       return "Invalid Date";
@@ -34,7 +34,7 @@ const FlightStatus = ({user, setUser}) => {
 
     useEffect(() => {
       const fetchFlights = async () => {
-          const response = await fetch('http://localhost:3001/api/flights');
+          const response = await apiFetch('/api/flights');
           if (!response.ok) {
             throw new Error('Failed to fetch flights');
           }
@@ -43,10 +43,10 @@ const FlightStatus = ({user, setUser}) => {
             flight.originAirport === data.originAirport &&
             flight.destinationAirport === data.destinationAirport
           );
-          
+
           const flightsWithDetails = [];
           for (const flight_ of filteredFlights) {
-            const detailsResponse = await fetch('http://localhost:3001/api/flightinfo');
+            const detailsResponse = await apiFetch('/api/flightinfo');
             if (detailsResponse.ok) {
               const detailsData = await detailsResponse.json();
               const flightDetails = detailsData.filter(flight =>
@@ -68,7 +68,7 @@ const FlightStatus = ({user, setUser}) => {
           // console.log(data.selectedDate.toString());
           // setFlights(filteredFlights);
       };
-  
+
       fetchFlights();
     }, [data.originAirport, data.destinationAirport, data.flightNumber, data.selectedDate ]);
 

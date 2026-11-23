@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -7,7 +6,7 @@ function About({ user, setUser }) {
   const sections = [
     {
       title: 'Our Mission',
-      text: 'Our mission is to revolutionize the way you book flights, making it easier, faster, and more convenient than ever before. We strive to empower travelers by offering a user-friendly platform that enables hassle-free booking, comprehensive flight information, and exceptional customer service.',
+      text: 'Our mission is to connect India through comfortable, dependable Flyhigh flights. Book directly with us, choose your cabin, and manage every part of your journey in one place.',
       img: '/mission.jpeg',
       icon: (
         <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -17,7 +16,7 @@ function About({ user, setUser }) {
     },
     {
       title: 'Who We Are',
-      text: 'Flyhigh is a leading provider of online flight booking services, catering to travelers from all walks of life. Our team comprises dedicated professionals with extensive experience in the travel industry, committed to delivering excellence in every aspect of our service.',
+      text: 'Flyhigh is the fictional airline at the heart of this learning project. We operate our own FH flight network between Delhi, Mumbai, Chennai and Kolkata, with an operations team managing routes, schedules and passengers.',
       img: '/whoweare.webp',
       icon: (
         <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -39,10 +38,10 @@ function About({ user, setUser }) {
 
   /* Key Metrics & Stats */
   const stats = [
-    { value: '500+', label: 'Global Routes' },
-    { value: '10M+', label: 'Happy Travelers' },
-    { value: '50+', label: 'Airline Partners' },
-    { value: '99.8%', label: 'On-Time Arrival' },
+    { value: '12', label: 'Domestic Routes' },
+    { value: '4', label: 'Connected Cities' },
+    { value: 'FH', label: 'Our Flight Code' },
+    { value: '100%', label: 'Demo Experience' },
   ];
 
   /* Core Values */

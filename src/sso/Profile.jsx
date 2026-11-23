@@ -1,29 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import AdminMenu from "../components/AdminMenu";
-import AdminNav from "../components/AdminNav";
+import { Link, useOutletContext } from 'react-router-dom';
+import { PageHeading } from '../components/AdminUI';
 
-function Profile() {
-  return (
-    <div className="grid grid-cols-12 min-h-screen min-w-screen">
-      <div className="min-h-screen col-span-3 flex flex-col items-center">
-        <AdminMenu />
-      </div>
-      <div className=" min-h-screen col-span-9">
-        <AdminNav />
-        <div className="w-[48vw] min-h-[200px] mt-20 rounded-lg shadow-lg flex items-center justify-center bg-gray-300 mx-auto">
-          <div className="w-[46vw] min-h-[170px] rounded-lg flex items-center flex-col justify-center bg-gray-200 shadow-md">
-            <div className="h-12 w-[42vw] mb-3 flex items-center pl-4 text-gray-500 bg-white rounded-md">
-              SATADIP DEBNATH
-            </div>
-            <div className="h-12 w-[42vw] bg-white mb-3 flex items-center pl-4 text-gray-500 rounded-md">
-              d.satadip@iitg.ac.in
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+export default function Profile() {
+  const { user } = useOutletContext();
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Administrator';
+  return <><PageHeading eyebrow="ACCOUNT" title="My profile" description="Your account details in one place." /><section className="admin-panel admin-profile"><div className="admin-profile-banner"><span className="admin-eyebrow">FLYHIGH WORKSPACE</span><h2>A little about you.</h2><span className="admin-profile-plane" aria-hidden="true">✈</span></div><div className="admin-profile-body"><span className="admin-avatar large">{name.slice(0, 1)}</span><h2>{name}</h2><p>Administration workspace</p><dl><div><dt>Full name</dt><dd>{name}</dd></div><div><dt>Email address</dt><dd>{user?.email || 'No signed-in account'}</dd></div><div><dt>Phone number</dt><dd>{user?.mobileNumber || 'Not provided'}</dd></div></dl>{!user && <Link className="admin-button secondary" to="/login">Sign in to your account ↗</Link>}</div></section></>;
 }
-
-export default Profile;

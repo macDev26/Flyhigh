@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 import React, { useState } from 'react';
 import NavbarL from '../components/NavbarL';
 import { useNavigate, Link } from 'react-router-dom';
@@ -60,7 +61,7 @@ const Register = () => {
 
     console.log(formData);
     // Send data to the backend
-    let response = await fetch('http://localhost:3001/api/users', {
+    let response = await apiFetch('/api/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

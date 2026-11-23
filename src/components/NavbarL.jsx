@@ -18,30 +18,10 @@ import { Link } from 'react-router-dom';
 const NavbarL = ({user, setUser}) => {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  const status = async () => {
-    console.log('Status Update');
-      const response = await fetch('http://localhost:3001/api/update-profile-on', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: user.email,
-          status: 0,
-        }),
-      });
-      if (!response.ok) {
-        const errorMessage = await response.text();
-        throw new Error(`Network response was not ok: ${response.statusText}, ${errorMessage}`);
-      }
-      const result = await response.json();
-      console.log('Status:', result);
-  };
 
-    const handleLogout = () => {
-      setUser(null);
-      status();
+
+    const handleLogout = async () => {
+      try { await setUser(null); } catch { alert('Unable to log out. Please try again.'); }
     };
 
     const handleUserCheck = (e) => {

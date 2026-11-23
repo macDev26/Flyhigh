@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import NavbarM from '../components/NavbarM';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
@@ -174,9 +174,10 @@ const PassengerForm = ({ user }) => {
               {/* Row 1: Title, First Name, Last Name */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">Title</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-title`}> Title</label>
                   <select
                     name="title"
+                    id={`passenger-${index}-title`}
                     value={passenger.title}
                     onChange={(e) => handleChange(e, index)}
                     className="w-full h-11 rounded-xl bg-white/[0.07] border border-white/[0.15] text-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400/50"
@@ -190,10 +191,11 @@ const PassengerForm = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">First Name</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-firstName`}> First Name</label>
                   <input
                     type="text"
                     name="firstName"
+                    id={`passenger-${index}-firstName`}
                     placeholder="e.g. John"
                     value={passenger.firstName}
                     onChange={(e) => handleChange(e, index)}
@@ -203,10 +205,11 @@ const PassengerForm = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">Last Name</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-lastName`}> Last Name</label>
                   <input
                     type="text"
                     name="lastName"
+                    id={`passenger-${index}-lastName`}
                     placeholder="e.g. Doe"
                     value={passenger.lastName}
                     onChange={(e) => handleChange(e, index)}
@@ -219,9 +222,10 @@ const PassengerForm = ({ user }) => {
               {/* Row 2: Gender, DOB, Mobile */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">Gender</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-gender`}> Gender</label>
                   <select
                     name="gender"
+                    id={`passenger-${index}-gender`}
                     value={passenger.gender}
                     onChange={(e) => handleChange(e, index)}
                     className="w-full h-11 rounded-xl bg-white/[0.07] border border-white/[0.15] text-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400/50"
@@ -234,10 +238,11 @@ const PassengerForm = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">Date of Birth</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-dob`}> Date of Birth</label>
                   <input
                     type="date"
                     name="dob"
+                    id={`passenger-${index}-dob`}
                     value={passenger.dob}
                     onChange={(e) => handleChange(e, index)}
                     className="w-full h-11 rounded-xl bg-white/[0.07] border border-white/[0.15] text-white px-4 text-sm outline-none focus:ring-2 focus:ring-brand-400/50 [color-scheme:dark]"
@@ -246,10 +251,11 @@ const PassengerForm = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1">Mobile Number</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 ml-1" htmlFor={`passenger-${index}-mobile`}> Mobile Number</label>
                   <input
                     type="tel"
                     name="mobile"
+                    id={`passenger-${index}-mobile`}
                     placeholder="10-digit mobile number"
                     value={passenger.mobile}
                     onChange={(e) => handleChange(e, index)}

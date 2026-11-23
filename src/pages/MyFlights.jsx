@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
+import { useState, useEffect } from 'react';
 import NavbarM from '../components/NavbarM';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
@@ -27,7 +28,7 @@ const MyFlights = ({ user }) => {
     const fetchFlights = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:3001/bookings');
+        const response = await apiFetch('/bookings');
         if (!response.ok) {
           throw new Error('Failed to fetch bookings');
         }
@@ -48,11 +49,10 @@ const MyFlights = ({ user }) => {
     }
   }, [activeEmail, activeUser, navigate]);
 
-  const handleCancel = (flightNumber) => {
-    const confirmCancel = window.confirm(`Are you sure you want to cancel your booking for flight ${flightNumber}?`);
-    if (confirmCancel) {
-      alert(`Flight cancellation request for ${flightNumber} has been submitted.`);
-    }
+  const bookingTime = value => {
+    if (!value) return '—';
+    const date = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : `${value}+05:30`);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   const formatDateTime = (dateTimeString) => {
@@ -300,11 +300,11 @@ const MyFlights = ({ user }) => {
                   {/* Actions segment */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-white/5">
                     <div className="text-slate-400 text-xs font-semibold">
-                      Booked On: {formatDate(flight.time?.split('T')[0])} {flight.time?.split('T')[1]?.substring(0, 5) || ''}
+                      {flight.payment?.status === 'paid' ? 'Stripe test payment verified · ' : 'Historical demo booking · '}Booked On: {bookingTime(flight.time)}
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <Link to="/eticket_" state={{ data: flight }}>
+                      <Link to={`/eticket?booking_id=${encodeURIComponent(flight._id)}`}>
                         <button className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 transition-all duration-200 flex items-center justify-center gap-2 text-sm transform active:scale-95">
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-4 h-4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 1.522A1 1 0 0116.9 20.7H7.1a1 1 0 01-.989-1.178L6.34 18m11.32 0h-11.32m0 0h-.01m0 0h-.01m0 0h-.01m0 0H6.25m11.41 0h.01m0 0h.01m0 0h.01m0 0H17.75M12 3v9m0 0l-3-3m3 3l3-3" />
@@ -313,14 +313,7 @@ const MyFlights = ({ user }) => {
                         </button>
                       </Link>
 
-                      {activeTab === 'upcoming' && (
-                        <button
-                          className="w-full sm:w-auto bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 font-bold px-6 py-3 rounded-xl transition-all duration-200 text-sm transform active:scale-95"
-                          onClick={() => handleCancel(flightData.flightNumber)}
-                        >
-                          Cancel Booking
-                        </button>
-                      )}
+
                     </div>
                   </div>
                 </div>
