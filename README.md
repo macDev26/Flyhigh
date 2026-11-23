@@ -5,6 +5,14 @@ flights; administrators manage its routes, departures, passengers and bookings.
 Stripe runs exclusively in test mode. This project does not charge real money or
 issue valid travel documents.
 
+## Earlier demo recordings
+
+These recordings show an earlier version of the project and predate the current
+single-airline, Google sign-in and verified Stripe test-booking changes.
+
+- [Demo 1 (without Stripe)](https://drive.google.com/file/d/1KRKBcX_lcVbeu2QQzBUnzvEUC4WgJwtj/view?usp=sharing)
+- [Demo 2 (with Stripe)](https://drive.google.com/file/d/1eci7aoBWVO76jqizuwhYSNivgLxFSRK5/view?usp=sharing)
+
 ## Run locally
 
 Requires Node.js, npm and a local MongoDB server.
