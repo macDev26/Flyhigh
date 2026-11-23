@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "db:start": "node localMongo.js",
-    "test": "node --test auth.test.js payments.test.js"
+    "test": "node --test auth.test.js payments.test.js deployment.test.js"
   },
   "keywords": [],
   "author": "",

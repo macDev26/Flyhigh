@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+backend/env.txt
+backend/*.test.js
+.local
+.git
+node_modules
+backend/node_modules
+dist
+demo_video

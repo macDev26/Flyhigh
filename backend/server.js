@@ -1,31 +1,23 @@
 const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "env.txt") });
+const hosted = Boolean(process.env.VERCEL);
+if (!hosted) require("dotenv").config({ path: path.resolve(__dirname, "env.txt") });
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const cors = require("cors");
 const bodyparser = require("body-parser");
 const { createAuth, publicUser, PROFILE_FIELDS } = require("./auth");
 const { ensureLocalMongo } = require("./localMongo");
-const { AIRLINE, ensureFlyhighNetwork } = require("./airline");
+const { AIRLINE, indiaDate, ensureFlyhighNetwork } = require("./airline");
 const { createPaymentService, PaymentError } = require("./payments");
 
 const stripeKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 const stripe = require("stripe")(stripeKey);
 
-// Global exception handler to prevent backend crashes
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err.message);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason?.message || reason);
-});
-
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 
 // Enable CORS
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174').split(',').map(origin => origin.trim());
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || (hosted ? 'https://airline-manager.vercel.app' : 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174')).split(',').map(origin => origin.trim());
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use((req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin && !allowedOrigins.includes(req.headers.origin)) {
@@ -36,22 +28,40 @@ app.use((req, res, next) => {
 
 // MongoDB connection URI
 const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017";
-if (!uri) {
-  console.error("Missing MONGO_URI. Please set it in backend/env.txt or .env");
-}
-const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
+const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000, maxPoolSize: 5 });
 const databaseName = process.env.MONGO_DB_NAME || "Airline";
 const database = client.db(databaseName);
 
-// Start this machine's recovered local database when needed, then connect.
-ensureLocalMongo(uri).then(() => client.connect()).then(() => {
-  return ensureFlyhighNetwork(database).then(() => {
-    console.log("MongoDB connected; Flyhigh departures ready");
-    payments.reconcile().catch(() => console.error('Stripe test checkout reconciliation will retry.'));
-  });
-}).catch((err) => {
-  console.error("MongoDB connection error:", err);
+// Reuse connections within each function instance. Never attempt to start the
+// Windows-only MongoDB installation on Vercel, or query before initialization.
+let connection;
+let networkRefresh;
+let networkDay;
+async function ready() {
+  if (hosted && !process.env.MONGO_URI) throw new Error('Configure MONGO_URI in Vercel.');
+  if (!connection) {
+    connection = (async () => {
+      if (!hosted) await ensureLocalMongo(uri);
+      await client.connect();
+      await database.collection('Sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'session_expiry' });
+    })().catch(error => { connection = undefined; throw error; });
+  }
+  await connection;
+  const today = indiaDate();
+  if (networkDay !== today) {
+    if (!networkRefresh) {
+      networkRefresh = ensureFlyhighNetwork(database).then(() => { networkDay = today; }).finally(() => { networkRefresh = undefined; });
+    }
+    await networkRefresh;
+  }
+}
+
+app.use(async (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { await ready(); next(); }
+  catch { res.status(503).json({ message: 'The flight database is unavailable. Please try again shortly.' }); }
 });
+app.get('/api/health', (req, res) => res.json({ status: 'ok', airline: AIRLINE.name, database: 'connected' }));
 
 const payments = createPaymentService({ db: database, stripe, testMode: /^(sk|rk)_test_/.test(stripeKey) && !/placeholder|your_/i.test(stripeKey), allowedOrigins, webhookSecret: process.env.STRIPE_WEBHOOK_SECRET });
 const paymentRoute = handler => async (req, res) => {
@@ -65,9 +75,10 @@ app.use(bodyparser.json());
 const asyncRoute = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const auth = createAuth({
   users: database.collection('Users'),
+  sessionCollection: database.collection('Sessions'),
   clientId: process.env.GOOGLE_CLIENT_ID,
   adminEmails: process.env.ADMIN_EMAILS,
-  production: process.env.NODE_ENV === 'production',
+  production: hosted || process.env.NODE_ENV === 'production',
 });
 app.post('/api/auth/google', auth.googleLogin);
 app.get('/api/auth/session', auth.session);
@@ -180,7 +191,7 @@ app.post("/api/login", asyncRoute(async (req, res) => {
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
     await database.collection('Users').updateOne({ _id: user._id }, { $set: { status: 1 } });
     // Password login never grants admin access; administrators must verify their Google identity.
-    res.json({ success: true, message: 'Login successful', user: auth.startSession(req, res, user, 'user') });
+    res.json({ success: true, message: 'Login successful', user: await auth.startSession(req, res, user, 'user') });
   } catch { res.status(503).json({ success: false, message: 'Unable to reach the account database.' }); }
 }));
 
@@ -439,17 +450,26 @@ app.get("/api/flight", (req, res) => {
 });
 
 app.post('/api/flight', (req, res) => res.status(410).json({ message: 'Seat allocation is handled by verified payment confirmation.' }));
-const reconciliationTimer = setInterval(() => payments.reconcile().catch(() => console.error('Stripe test reconciliation will retry.')), 60000);
-reconciliationTimer.unref();
-const demoNetworkTimer = setInterval(() => ensureFlyhighNetwork(database).catch(() => console.error('Flyhigh demo departure refresh will retry.')), 6 * 60 * 60 * 1000);
-demoNetworkTimer.unref();
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   res.status(error.status || 500).json({ success: false, message: 'The request could not be completed. Please try again.' });
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Vercel imports the app without opening a TCP listener or relying on timers.
+// Hosted payment recovery uses the signed Stripe webhook and return-page check.
+if (require.main === module) {
+  ready().then(() => {
+    app.listen(port, () => console.log(`Server running on port ${port}; Flyhigh database ready`));
+    const reconciliationTimer = setInterval(() => payments.reconcile().catch(() => console.error('Stripe test reconciliation will retry.')), 60000);
+    reconciliationTimer.unref();
+    const demoNetworkTimer = setInterval(() => ready().catch(() => console.error('Flyhigh demo departure refresh will retry.')), 6 * 60 * 60 * 1000);
+    demoNetworkTimer.unref();
+    payments.reconcile().catch(() => console.error('Stripe test reconciliation will retry.'));
+  }).catch(() => {
+    console.error('Unable to start: check the MongoDB connection and network access.');
+    client.close().finally(() => { process.exitCode = 1; });
+  });
+}
+
+module.exports = { app, ready, client };

@@ -6,7 +6,7 @@ function publicUser(user, role = 'user') {
   return { email: user.email, role, ...Object.fromEntries(PROFILE_FIELDS.map(key => [key, user[key] || ''])) };
 }
 
-function createAuth({ users, clientId, adminEmails = '', production = false, verifyToken, now = Date.now }) {
+function createAuth({ users, sessionCollection, clientId, adminEmails = '', production = false, verifyToken, now = Date.now }) {
   const google = new OAuth2Client();
   const verify = verifyToken || (async credential => (await google.verifyIdToken({ idToken: credential, audience: clientId })).getPayload());
   const administrators = new Set(adminEmails.split(',').map(email => email.trim().toLowerCase()).filter(Boolean));
@@ -14,34 +14,45 @@ function createAuth({ users, clientId, adminEmails = '', production = false, ver
   const cookieName = 'flyhigh_session';
   const lifetime = 8 * 60 * 60 * 1000;
   const cookieFlags = `Path=/; HttpOnly; SameSite=Lax${production ? '; Secure' : ''}`;
+  const digest = id => crypto.createHash('sha256').update(id).digest('hex');
   function sessionId(req) {
     return (req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
   }
-  function getSession(req) {
+  async function deleteSession(id) {
+    if (!id) return;
+    if (sessionCollection) await sessionCollection.deleteOne({ _id: digest(id) });
+    else sessions.delete(id);
+  }
+  async function getSession(req) {
     const id = sessionId(req);
-    const session = sessions.get(id);
-    if (!session || session.expires <= now()) { sessions.delete(id); return null; }
+    if (!/^[a-f0-9]{64}$/.test(id || '')) return null;
+    const stored = sessionCollection ? await sessionCollection.findOne({ _id: digest(id) }) : sessions.get(id);
+    const session = stored && { user: stored.user, expires: sessionCollection ? stored.expiresAt.getTime() : stored.expires };
+    if (!session || session.expires <= now()) { await deleteSession(id); return null; }
     // Re-evaluate the allowlist instead of trusting a role supplied by a browser.
     if (session.user.role === 'admin' && !administrators.has(session.user.email.toLowerCase())) return null;
     return session;
   }
-  function startSession(req, res, user, role = 'user') {
-    sessions.delete(sessionId(req));
+  async function startSession(req, res, user, role = 'user') {
+    await deleteSession(sessionId(req));
     for (const [id, session] of sessions) if (session.expires <= now()) sessions.delete(id);
     const id = crypto.randomBytes(32).toString('hex');
     const profile = publicUser(user, role);
-    sessions.set(id, { user: profile, expires: now() + lifetime });
+    if (sessionCollection) await sessionCollection.insertOne({ _id: digest(id), user: profile, expiresAt: new Date(now() + lifetime) });
+    else sessions.set(id, { user: profile, expires: now() + lifetime });
     res.setHeader('Set-Cookie', `${cookieName}=${id}; Max-Age=${lifetime / 1000}; ${cookieFlags}`);
     return profile;
   }
-  function requireUser(req, res, next) {
-    const session = getSession(req);
-    if (!session) return res.status(401).json({ success: false, message: 'Please sign in to continue.' });
-    req.authUser = session.user;
-    next();
+  async function requireUser(req, res, next) {
+    try {
+      const session = await getSession(req);
+      if (!session) return res.status(401).json({ success: false, message: 'Please sign in to continue.' });
+      req.authUser = session.user;
+      return next();
+    } catch { return res.status(503).json({ success: false, message: 'Unable to verify your session. Please try again shortly.' }); }
   }
   function requireAdmin(req, res, next) {
-    requireUser(req, res, () => {
+    return requireUser(req, res, () => {
       if (req.authUser.role !== 'admin') return res.status(403).json({ success: false, message: 'Administrator access is required.' });
       next();
     });
@@ -70,21 +81,24 @@ function createAuth({ users, clientId, adminEmails = '', production = false, ver
         user = { email, googleSub: payload.sub, firstName: payload.given_name || payload.name || '', lastName: payload.family_name || '', title: '', mobileNumber: '', status: 1 };
         await users.insertOne(user);
       }
-      return res.json({ success: true, user: startSession(req, res, user, role) });
+      return res.json({ success: true, user: await startSession(req, res, user, role) });
     } catch {
       return res.status(503).json({ success: false, message: 'Unable to reach the account database. Please try again shortly.' });
     }
   }
   async function logout(req, res) {
-    const session = getSession(req);
-    sessions.delete(sessionId(req));
     res.setHeader('Set-Cookie', `${cookieName}=; Max-Age=0; ${cookieFlags}`);
-    if (session) users.updateOne({ email: session.user.email }, { $set: { status: 0 } }).catch(() => {});
-    res.json({ success: true });
+    try {
+      const session = await getSession(req);
+      await deleteSession(sessionId(req));
+      if (session) await users.updateOne({ email: session.user.email }, { $set: { status: 0 } });
+      return res.json({ success: true });
+    } catch { return res.status(503).json({ success: false, message: 'Unable to finish signing out. Please try again.' }); }
   }
-  function session(req, res) {
+  async function session(req, res) {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ user: getSession(req)?.user || null });
+    try { return res.json({ user: (await getSession(req))?.user || null }); }
+    catch { return res.status(503).json({ success: false, message: 'Unable to verify your session. Please try again shortly.' }); }
   }
   return { googleLogin, session, logout, getSession, startSession, requireUser, requireAdmin };
 }

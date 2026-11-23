@@ -36,7 +36,9 @@ or [administrator sign-in](http://localhost:5173/admin/login). Use `localhost`
 when signing in with the currently configured Google OAuth client.
 
 The frontend uses Vite’s same-origin proxy for `/api`, `/bookings` and
-`/fltstatus`. Production hosting would also need that API proxy and HTTPS.
+`/fltstatus`. Vercel routes these to the included Express function. See
+[DEPLOYMENT.md](DEPLOYMENT.md) for Atlas setup, hosted environment variables
+and the production verification checklist.
 
 ## Configuration
 
@@ -57,8 +59,8 @@ Both Google IDs must match. Register your actual frontend origin under the
 client’s Authorized JavaScript origins in Google Auth Platform. Users can use
 Google or an existing email/password account; administrator access requires a
 verified Google identity and the backend email allowlist. Sessions use HttpOnly,
-SameSite cookies, expire after eight hours and are invalidated by backend
-restarts. Session storage is used only for display, not backend authorization.
+SameSite cookies, expire after eight hours, and persist in MongoDB across
+backend restarts and hosted function instances. Session storage is used only for display, not backend authorization.
 
 See [Google’s client setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
 and [token verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
@@ -67,7 +69,8 @@ and [token verification](https://developers.google.com/identity/gsi/web/guides/v
 
 The application maintains twelve initial Flyhigh routes between Delhi, Mumbai,
 Chennai and Kolkata. Flights use `FH101` through `FH112`. On startup and every
-six hours, the backend adds missing demo departures for the next fourteen days,
+six hours locally, and on the first request after India’s date changes when
+hosted, the backend adds missing demo departures for the next fourteen days,
 using India’s calendar date. Existing schedules, fares and sold seats are not
 reset. Economy and Business cabins are available on the initial routes.
 
@@ -105,8 +108,10 @@ endpoints are disabled. E-tickets load saved bookings for the authenticated
 owner; old `?info=...` ticket payloads no longer confirm anything.
 
 For local learning, the return page verifies payment directly with Stripe, and
-a backend reconciliation task checks pending sessions every minute, including
-when the customer never returns. Signed webhook handling is also implemented.
+a local backend reconciliation task checks pending sessions every minute,
+including when the customer never returns. On Vercel, configure the signed Stripe
+webhook as described in [DEPLOYMENT.md](DEPLOYMENT.md); hosted functions do not
+rely on background timers.
 To exercise real webhook deliveries locally, install the official Stripe CLI
 and run:
 

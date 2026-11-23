@@ -26,12 +26,12 @@ test('Google user signup creates a profile and an opaque HttpOnly session', asyn
   assert.equal(res.code, 200); assert.equal(res.body.user.role, 'user'); assert.equal(records.length, 1);
   assert.match(res.headers['Set-Cookie'], /HttpOnly; SameSite=Lax/);
   assert.equal(res.body.user.googleSub, undefined); assert.equal(res.body.user.password, undefined);
-  assert.equal(auth.getSession({ headers: { cookie: res.headers['Set-Cookie'] } }).user.email, 'admin@gmail.com');
+  assert.equal((await auth.getSession({ headers: { cookie: res.headers['Set-Cookie'] } })).user.email, 'admin@gmail.com');
 });
 test('only the explicitly allowed Google email can obtain an admin session', async () => {
   const { auth } = setup(); const res = await login(auth, 'admin');
   assert.equal(res.body.user.role, 'admin');
-  let reached = false; auth.requireAdmin({ headers: { cookie: res.headers['Set-Cookie'] } }, response(), () => { reached = true; }); assert.equal(reached, true);
+  let reached = false; await auth.requireAdmin({ headers: { cookie: res.headers['Set-Cookie'] } }, response(), () => { reached = true; }); assert.equal(reached, true);
 });
 test('an unlisted Google account is denied before creating an account', async () => {
   const { auth, records } = setup({ verifyToken: async () => ({ ...identity, email: 'other@gmail.com' }) });
@@ -39,11 +39,11 @@ test('an unlisted Google account is denied before creating an account', async ()
 });
 test('user sessions cannot access admin endpoints even for an allowlisted email', async () => {
   const { auth } = setup(); const res = await login(auth, 'user'); const denied = response();
-  auth.requireAdmin({ headers: { cookie: res.headers['Set-Cookie'] }, body: { role: 'admin' } }, denied, () => assert.fail('Admin access granted'));
+  await auth.requireAdmin({ headers: { cookie: res.headers['Set-Cookie'] }, body: { role: 'admin' } }, denied, () => assert.fail('Admin access granted'));
   assert.equal(denied.code, 403);
 });
-test('missing and forged session cookies are rejected', () => {
-  const { auth } = setup(); for (const cookie of ['', 'flyhigh_session=forged']) { const res = response(); auth.requireAdmin({ headers: { cookie } }, res, () => assert.fail('Access granted')); assert.equal(res.code, 401); }
+test('missing and forged session cookies are rejected', async () => {
+  const { auth } = setup(); for (const cookie of ['', 'flyhigh_session=forged']) { const res = response(); await auth.requireAdmin({ headers: { cookie } }, res, () => assert.fail('Access granted')); assert.equal(res.code, 401); }
 });
 test('invalid or expired Google tokens never create sessions', async () => {
   const { auth, records } = setup({ verifyToken: async () => { throw new Error('Invalid signature or expiration'); } }); const res = await login(auth);
@@ -65,9 +65,9 @@ test('conflicting Google account links are rejected', async () => {
 });
 test('sessions expire and logout immediately revokes a cookie', async () => {
   let time = 0; const { auth } = setup({ now: () => time }); let res = await login(auth); const req = { headers: { cookie: res.headers['Set-Cookie'] } };
-  time = 8 * 60 * 60 * 1000; assert.equal(auth.getSession(req), null);
+  time = 8 * 60 * 60 * 1000; assert.equal(await auth.getSession(req), null);
   res = await login(auth); req.headers.cookie = res.headers['Set-Cookie']; const out = response(); await auth.logout(req, out);
-  assert.equal(auth.getSession(req), null); assert.match(out.headers['Set-Cookie'], /Max-Age=0/);
+  assert.equal(await auth.getSession(req), null); assert.match(out.headers['Set-Cookie'], /Max-Age=0/);
 });
 test('configuration and database failures produce recoverable errors', async () => {
   assert.equal((await login(setup({ clientId: '' }).auth)).code, 503);

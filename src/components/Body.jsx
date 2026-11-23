@@ -4,14 +4,18 @@ import { Link } from "react-router-dom";
 
 const Body = () => {
   const [showBookFlight, setShowBookFlight] = useState(true);
-  const [airports, setAirports] = useState([]);
-  const [airports_, setAirports_] = useState([]);
+  const [airportCatalog, setAirportCatalog] = useState([]);
+  const [airportsLoading, setAirportsLoading] = useState(true);
+  const [airportError, setAirportError] = useState('');
+  const [airportAttempt, setAirportAttempt] = useState(0);
   const [originAirport, setOriginAirport] = useState('NULL');
   const [originAirport_, setOriginAirport_] = useState('NULL');
   const [destinationAirport, setDestinationAirport] = useState('NULL');
   const [destinationAirport_, setDestinationAirport_] = useState('NULL');
-  const [filteredAirports, setFilteredAirports] = useState([]);
-  const [filteredAirports_, setFilteredAirports_] = useState([]);
+  const airports = airportCatalog.filter(airport => airport.code !== destinationAirport);
+  const airports_ = airportCatalog.filter(airport => airport.code !== destinationAirport_);
+  const filteredAirports = airportCatalog.filter(airport => airport.code !== originAirport);
+  const filteredAirports_ = airportCatalog.filter(airport => airport.code !== originAirport_);
   const [passengers, setPassengers] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedDate_, setSelectedDate_] = useState('');
@@ -35,44 +39,24 @@ const Body = () => {
   };
 
   useEffect(() => {
+    let active = true;
+    setAirportsLoading(true);
+    setAirportError('');
     apiFetch('/api/airports')
-      .then(response => response.json())
-      .then(data => {
-        const Filter = data.filter(airport => airport.code !== destinationAirport);
-        setAirports(Filter);
+      .then(async response => {
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Unavailable');
+        return response.json();
       })
-      .catch(error => console.error('Error fetching data:', error));
-  }, [destinationAirport]);
-
-  useEffect(() => {
-    apiFetch('/api/airports')
-      .then(response => response.json())
       .then(data => {
-        const Filter = data.filter(airport => airport.code !== destinationAirport_);
-        setAirports_(Filter);
+        if (!Array.isArray(data) || !data.length || data.some(airport => !airport.code || !airport.name)) throw new Error('Invalid airport data');
+        if (active) setAirportCatalog(data);
       })
-      .catch(error => console.error('Error fetching data:', error));
-  }, [destinationAirport_]);
-
-  useEffect(() => {
-    apiFetch('/api/airports')
-      .then(response => response.json())
-      .then(data => {
-        const filtered = data.filter(airport => airport.code !== originAirport);
-        setFilteredAirports(filtered);
+      .catch(() => {
+        if (active) setAirportError('Flight search is temporarily unavailable. Please try again shortly.');
       })
-      .catch(error => console.error('Error fetching data:', error));
-  }, [originAirport]);
-  
-  useEffect(() => {
-    apiFetch('/api/airports')
-      .then(response => response.json())
-      .then(data => {
-        const filtered = data.filter(airport => airport.code !== originAirport_);
-        setFilteredAirports_(filtered);
-      })
-      .catch(error => console.error('Error fetching data:', error));
-  }, [originAirport_]);
+      .finally(() => { if (active) setAirportsLoading(false); });
+    return () => { active = false; };
+  }, [airportAttempt]);
 
   const handleToggleToBook = () => {
     setShowBookFlight(true);
@@ -215,6 +199,11 @@ const Body = () => {
 
           {/* ── Booking Card ────────────────────────────── */}
           <div className="w-full glass rounded-3xl p-8 shadow-2xl animate-slide-up" style={{ animationDelay: '0.3s' }}>
+            {airportsLoading && <p role="status" className="mb-5 text-sm text-slate-300">Loading Flyhigh airports…</p>}
+            {airportError && <div role="alert" className="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+              <p>{airportError}</p>
+              <button type="button" onClick={() => setAirportAttempt(value => value + 1)} className="mt-2 font-semibold underline">Retry flight search</button>
+            </div>}
             {/* Tabs */}
             <div className="flex gap-2 mb-7">
               <button
@@ -309,7 +298,7 @@ const Body = () => {
                     type="submit"
                     id="submit"
                     onClick={handleSubmit}
-                    disabled={originAirport === "NULL" || destinationAirport === "NULL"}
+                    disabled={airportsLoading || Boolean(airportError) || originAirport === "NULL" || destinationAirport === "NULL"}
                     className="group relative w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 via-purple-600 to-indigo-600 text-white font-bold text-base shadow-xl shadow-brand-500/25 hover:shadow-glow hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden border border-white/20"
                   >
                     <span className="relative z-10 flex items-center gap-2 tracking-wide">
@@ -327,7 +316,7 @@ const Body = () => {
                     type="submit"
                     id="submit"
                     onClick={handleSubmit}
-                    disabled={originAirport_ === "NULL" || destinationAirport_ === "NULL"}
+                    disabled={airportsLoading || Boolean(airportError) || originAirport_ === "NULL" || destinationAirport_ === "NULL"}
                     className="group relative w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 via-purple-600 to-indigo-600 text-white font-bold text-base shadow-xl shadow-brand-500/25 hover:shadow-glow hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden border border-white/20"
                   >
                     <span className="relative z-10 flex items-center gap-2 tracking-wide">
