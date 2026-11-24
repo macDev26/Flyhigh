@@ -13,6 +13,15 @@ const { createPaymentService, PaymentError } = require("./payments");
 const stripeKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 const stripe = require("stripe")(stripeKey);
 
+// Global exception handler to prevent backend crashes
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err.message);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason?.message || reason);
+});
+
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 
