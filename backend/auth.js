@@ -75,10 +75,17 @@ function createAuth({ users, sessionCollection, clientId, adminEmails = '', prod
       if (user && user.email.toLowerCase() !== email) return res.status(409).json({ success: false, message: 'This Google account’s email has changed. Please contact support.' });
       if (!user) user = await users.findOne({ email: { $regex: `^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
       if (user?.googleSub && user.googleSub !== payload.sub) return res.status(409).json({ success: false, message: 'This email is linked to a different Google account.' });
+      const googleNames = { firstName: payload.given_name?.trim() || payload.name?.trim() || '', lastName: payload.family_name?.trim() || '' };
       if (user) {
-        await users.updateOne({ _id: user._id }, { $set: { googleSub: payload.sub, status: 1 } });
+        const updates = { email, googleSub: payload.sub, status: 1 };
+        // Fill incomplete profiles from Google's verified identity without replacing saved names.
+        for (const [field, value] of Object.entries(googleNames)) {
+          if (!user[field]?.trim() && value) updates[field] = value;
+        }
+        await users.updateOne({ _id: user._id }, { $set: updates });
+        user = { ...user, ...updates };
       } else {
-        user = { email, googleSub: payload.sub, firstName: payload.given_name || payload.name || '', lastName: payload.family_name || '', title: '', mobileNumber: '', status: 1 };
+        user = { email, googleSub: payload.sub, ...googleNames, title: '', mobileNumber: '', status: 1 };
         await users.insertOne(user);
       }
       return res.json({ success: true, user: await startSession(req, res, user, role) });

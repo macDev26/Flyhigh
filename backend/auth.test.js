@@ -9,7 +9,7 @@ function response() {
 function setup(options = {}) {
   const records = [];
   const users = {
-    async findOne(query) { return records.find(user => query.googleSub ? user.googleSub === query.googleSub : new RegExp(query.email.$regex, 'i').test(user.email)) || null; },
+    async findOne(query) { const user = records.find(user => query.googleSub ? user.googleSub === query.googleSub : new RegExp(query.email.$regex, 'i').test(user.email)); return user ? { ...user } : null; },
     async insertOne(user) { user._id = records.length + 1; records.push(user); },
     async updateOne(query, update) { const user = records.find(row => query._id ? row._id === query._id : row.email === query.email); if (user) Object.assign(user, update.$set); },
   };
@@ -24,6 +24,8 @@ async function login(auth, role = 'user') {
 test('Google user signup creates a profile and an opaque HttpOnly session', async () => {
   const { auth, records } = setup(); const res = await login(auth);
   assert.equal(res.code, 200); assert.equal(res.body.user.role, 'user'); assert.equal(records.length, 1);
+  assert.equal(res.body.user.firstName, 'Admin'); assert.equal(res.body.user.lastName, 'Tester'); assert.equal(res.body.user.email, identity.email);
+  assert.equal(records[0].firstName, 'Admin'); assert.equal(records[0].lastName, 'Tester'); assert.equal(records[0].email, identity.email);
   assert.match(res.headers['Set-Cookie'], /HttpOnly; SameSite=Lax/);
   assert.equal(res.body.user.googleSub, undefined); assert.equal(res.body.user.password, undefined);
   assert.equal((await auth.getSession({ headers: { cookie: res.headers['Set-Cookie'] } })).user.email, 'admin@gmail.com');
@@ -58,6 +60,37 @@ test('returning Google users and existing Gmail password accounts reuse one acco
   const { auth, records } = setup(); records.push({ _id: 1, email: identity.email, password: 'legacy-secret', firstName: 'Existing', mobileNumber: '123' });
   const first = await login(auth); await login(auth);
   assert.equal(records.length, 1); assert.equal(first.body.user.firstName, 'Existing'); assert.equal(records[0].googleSub, identity.sub); assert.equal(first.body.user.password, undefined);
+});
+
+test('Google sign-in fills missing account names and returns them in the restored session', async () => {
+  for (const googleSub of [undefined, identity.sub]) {
+    const { auth, records } = setup();
+    records.push({ _id: 1, email: 'Admin@Gmail.com', googleSub, firstName: '  ', lastName: '', mobileNumber: '123' });
+    const res = await login(auth);
+    assert.equal(res.code, 200); assert.equal(records.length, 1);
+    assert.equal(records[0].email, identity.email);
+    assert.equal(records[0].firstName, 'Admin'); assert.equal(records[0].lastName, 'Tester');
+    assert.equal(records[0].mobileNumber, '123');
+    const restored = response();
+    await auth.session({ headers: { cookie: res.headers['Set-Cookie'] } }, restored);
+    assert.equal(restored.body.user.firstName, 'Admin'); assert.equal(restored.body.user.lastName, 'Tester');
+    assert.equal(restored.body.user.email, identity.email);
+  }
+});
+
+test('Google sign-in preserves names already entered by the user', async () => {
+  const { auth, records } = setup();
+  records.push({ _id: 1, email: identity.email, firstName: 'Chosen', lastName: 'Name' });
+  const res = await login(auth);
+  assert.equal(res.body.user.firstName, 'Chosen'); assert.equal(res.body.user.lastName, 'Name');
+  assert.equal(records[0].firstName, 'Chosen'); assert.equal(records[0].lastName, 'Name');
+});
+
+test('Google display name is used when a given name is unavailable', async () => {
+  const { auth, records } = setup({ verifyToken: async () => ({ ...identity, given_name: undefined, family_name: undefined, name: '  Google Member  ' }) });
+  const res = await login(auth);
+  assert.equal(res.body.user.firstName, 'Google Member'); assert.equal(res.body.user.lastName, '');
+  assert.equal(records[0].firstName, 'Google Member');
 });
 test('conflicting Google account links are rejected', async () => {
   const { auth, records } = setup(); records.push({ _id: 1, email: identity.email, googleSub: 'another-subject' });
